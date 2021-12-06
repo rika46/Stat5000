@@ -1,0 +1,426 @@
+---
+title: "Stat5000 Project"
+author: "Chanthrika"
+date: "04/12/2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  word_document: default
+---
+## INTRODUCTION
+
+In this project, I am creating a model that will be used to predict the future Close price and Price per earning ratio of the Tata Motors Limited company. There are also different visualization charts created by comparing different columns in the data. This project contains time series forecasting for Close price and Price per earning ratio to predict future values based on previously observed values. 
+
+For this analysis, I downloaded the Tata Motors Limited data from Yahoo finance and split the data into training data, visual data, testing data. Training data is for modelling and training the data, visual data is for visualizing the limited data for clear representation and testing data is for predicting and calculating the error in the model. 
+
+## ABOUT THE DATASET
+The data set contains data from the year Jan 2006 to Nov 23 2021. 
+
+Columns in the data set,
+
+#### Date - Daily date for analysis
+#### Open - The opening price for the day.
+#### High - The highest price for the day.
+#### Low - The lowest price for the day.
+#### Close - The closing price for the day.
+#### Adj Close - The opening price for the day. 
+#### Volume - Measures the number of shares traded in a stock or contracts traded in futures or options
+#### EPS - Describing a public company's profit per outstanding share of stock, calculated on a quarterly or annual basis
+
+
+## 1. Importing the data
+
+The full data for training the model, Visual data and  Testing data is separated and imported.
+
+```{r}
+library(webshot)
+tatamotors <- read.csv('TTM.csv')
+limited_TTM <- read.csv('limited_ttm.csv')
+testing <- read.csv('testing.csv')
+```
+
+## 2. Cleaning and Preprocessing 
+
+### 2.1. Cleaning Full data
+
+In the below code, I have cleaned the data by dropping the NA values, removing the rows from the data where EPS(Earnings Per Share) is less than zero because negative EPS means we are likely going to get a negative P/E ratio (Price per Earning Ratio).
+
+```{r}
+library(tidyverse)
+library(zoo)
+tatamotors <- tatamotors%>% drop_na()
+tatamotors <- tatamotors%>% add_column(dates =as.Date(tatamotors$Date, format="%Y-%m-%d"))
+tatamotors <- tatamotors %>% filter(EPS>0)
+tatamotors <- tatamotors%>% mutate(month = format(dates, "%m"), 
+                                   year = format(dates, "%Y"))%>% summarise(Date, 
+                                   Volume, Open, Close, High, Low, month, year, dates, EPS ,
+                                   Accumulation = ((Close - Low)- (High - Close)), Distribution = (High - Low), MFM = ((Close - Low)- (High - Close)) / (High - Low),
+                                   y = as.yearqtr(dates, format = "%Y-%m-%d"), AD = Accumulation/Distribution * 100,
+                                   pe =as.integer(Close/EPS)) %>% filter(pe>0)
+```
+
+In the above code, the calculation for Accumulation, Distribution, MFM(Money Factor Multiplier) and P/E (Price per Earnings) are mutated.
+
+### Formulae used:
+
+Accumulation = (Close - Low)- (High - Close)
+Distribution = (High - Low)
+MFM = ((Close - Low)- (High - Close)) / (High - Low)
+PE = Close/EPS
+
+
+### 2.2 Cleaning Testing data
+
+In the below code, I have cleaned the data by dropping the NA values, removing the rows from the data where EPS(Earnings Per Share) is less than zero because negative EPS means we are likely going to get a negative P/E ratio (Price per Earning Ratio).
+
+```{r}
+library(mondate)
+library(zoo)
+test <- testing %>% drop_na()
+test <- test %>% add_column(dates=as.Date(test$Date, format="%Y-%m-%d"))
+test <- test %>% filter(EPS>0)
+test <- test %>% mutate(month = format(dates, "%m"), 
+                        year = format(dates, "%Y")) %>%  summarise(Date, Volume, 
+                        Open, Close, High, Low, month, dates, EPS,
+                        Accumulation = ((Close - Low)- (High - Close)), Distribution = (High - Low), MFM = ((Close - Low)- (High - Close)) / (High - Low),
+                        y = as.yearqtr(dates, format = "%Y-%m-%d"), AD = Accumulation/Distribution * 100 ,
+                        pe =as.integer(Close/EPS))%>% filter(pe>0)
+
+```
+
+### 2.3 Cleaning Visual data
+
+In the below code, I have cleaned the data by dropping the NA values, removing the rows from the data where EPS(Earnings Per Share) is less than zero because negative EPS means we are likely going to get a negative P/E ratio (Price per Earning Ratio).
+
+```{r}
+library(tidyverse)
+visual_data <- limited_TTM %>% drop_na()
+visual_data <- visual_data%>% add_column(dates=as.Date(visual_data$Date, format="%Y-%m-%d"))
+pe_visual_data <- visual_data %>% filter(EPS>0)
+visual_data <- visual_data%>% mutate(month = format(dates, "%m"), 
+                                     year = format(dates, "%Y"))%>% summarise(Date, Volume,
+                                     Open, Close, High, Low, month, year, dates, EPS ,
+                                     Accumulation = ((Close - Low)- (High - Close)), Distribution = (High - Low), MFM = ((Close - Low)- (High - Close)) / (High - Low), 
+                                     y = as.yearqtr(dates, format = "%Y-%m-%d") ,
+                                     pe =as.integer(Close/EPS))
+pe_visual_data <- visual_data%>% mutate(month = format(dates, "%m"), 
+                                        year = format(dates, "%Y"))%>% summarise(Date, Volume, 
+                                        Open, Close, High, Low, month, year, dates, EPS ,
+                                        Accumulation = ((Close - Low)- (High - Close)), Distribution = (High - Low), MFM = ((Close - Low)- (High - Close)) / (High - Low), 
+                                        y = as.yearqtr(dates, format = "%Y-%m-%d") , AD = Accumulation/Distribution * 100, 
+                                        pe =as.integer(Close/EPS)) %>% filter(pe>0)
+
+```
+
+## 3. Visualization 
+
+### 3.1. Visualising for Daily Close Price
+
+In the below code, I have created a visualization for the Daily Close Price using the visual data.
+
+```{r}
+Daily_Close_Price <- visual_data %>% filter(Date > "2021-07-28")
+p <- ggplot(data=Daily_Close_Price, aes(x=Date, y=Close, 
+                        group=1)) + scale_x_discrete(guide = guide_axis(check.overlap = TRUE))+
+  geom_line(color = "red")+labs(title = "Daily Close Price",
+                          x = "Dates",y="Close Price", color = "red")
+ p +theme(panel.background = element_rect(fill = 'lightblue', colour = 'red'))
+```
+
+### 3.2. Visualising for Price per earning Ratio (p/e)
+
+In the below code, I have created a visualization for Price per Earning Ratio for the Year 2020 and 2021 using the visual data.
+
+```{r}
+visual <- pe_visual_data %>% filter(Date > "2020-01-02") %>% mutate(pe=pe/10)%>% summarise(Date, pe)
+
+p <- ggplot(data=visual, aes(x=Date, y=pe,group =1, 
+                        color = "red")) + scale_x_discrete(guide = guide_axis(check.overlap = TRUE))+
+  geom_line(color="red",linetype = "dashed")
+p +ggtitle("Price per Earning Ratio for the Year 2020 and 2021") + theme(panel.background = element_rect(fill = 'lightblue', colour = 'red'))
+```
+### 3.3. Representing Normally Distributed Closing value in the data
+
+In the below code, I have distributed the Closing price of the company's stock price and it follows normal distribution as all the stock market data follows Normal Distribution.
+
+```{r}
+mean_c = mean(visual_data$Close)
+mean_c
+sd_c = sd(visual_data$Close)
+sd_c
+Normaldistribution <- dnorm(visual_data$Close, mean = 23.79998, sd = 11.47483 , log = FALSE)
+plot(visual_data$Close, Normaldistribution)
+```
+
+### 3.4. Visualising Accumulation for last 5 months of 2021 and Accumulation from the year 2015
+
+The below code visualizes the Accumulation for last 5 months of 2021 and Accumulation from the year 2015 
+
+```{r}
+Acc_Dis <- visual_data %>% filter(Date > "2021-05-10") 
+p <- ggplot(data=Acc_Dis, aes(x=Date, y=Accumulation, group=1)) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))+
+  geom_line(color="red")+
+  geom_point()
+ p +ggtitle("Accumulation for last 5 months of 2021") + 
+   theme(panel.background = element_rect(fill = 'lightblue', colour = 'red'))
+
+p <- ggplot(data=visual_data, aes(x=Date, y=Accumulation, group=1)) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))+
+  geom_line(color="red")+
+  geom_point()  
+ p +ggtitle("Accumulation from the year 2015") + 
+   theme(panel.background = element_rect(fill = 'lightblue', colour = 'red'))
+```
+Accumulation more specifically means overall increase in buying activity in an asset. Stocks whose prices are rising are considered to be under accumulation.
+
+### 3.5. Visualising Distribution for last 4 months of 2021 and Distribution from the year 2015
+
+The below code visualizes the Distribution for last 4 months of 2021 and Distribution from the year 2015
+
+```{r}
+p <- ggplot(data=Acc_Dis, aes(x=Date, y=Distribution, group=1)) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))+
+  geom_line(color="red")+
+  geom_point()
+ p +ggtitle("Distribution for last 5 months of 2021") + 
+   theme(panel.background = element_rect(fill = 'lightblue', colour = 'red'))
+
+ p <- ggplot(data=visual_data, aes(x=Date, y=Distribution, group=1)) + 
+   scale_x_discrete(guide = guide_axis(check.overlap = TRUE))+
+  geom_line(color="red")+
+  geom_point()
+ p +ggtitle("Distribution from the year 2015") +
+   theme(panel.background = element_rect(fill = 'lightblue', colour = 'red'))
+```   
+
+The Distribution refers specifically to the general act of selling off shares for various reasons.
+
+### 3.6. Visualising Accumulation/Distribution Ratio(A/D) or Money factor Multiplier(MFM) for last 4d months of 2021
+
+The below code visualizes the Distribution for last 4 months of 2021 and Distribution from the year 2015
+
+```{r}
+
+Acc_by_Dis <- Acc_Dis %>% mutate(AD = Accumulation/Distribution * 100)
+p <- ggplot(data=Acc_by_Dis, aes(x=Date, y=AD,group =1, color = "red")) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))+
+  geom_line()+geom_point()
+
+ p +ggtitle("Accumulation/Distribution for last 5 months of 2021") + 
+   theme(panel.background = element_rect(fill = 'lightblue', colour = 'red'))
+```
+In general, a rising A/D line helps confirm a rising price trend, while a falling A/D line helps confirm a price downtrend.
+
+## 3.7. Candle Stick Chart
+
+Candlestick charts are used by traders to determine possible price movement based on past patterns.
+Candlesticks are useful when trading as they show four price points (open, close, high, and low) throughout the period of time the trader specifies.
+
+```{r}
+library(quantmod)
+library(plotly)
+fig <- visual_data%>%plot_ly(x = ~Date, type="candlestick",
+          open = ~visual_data$Open, close = ~visual_data$Close,
+          high = ~visual_data$High, low = ~visual_data$Low) 
+fig <- fig %>% layout(title = "Basic Candlestick Chart")
+
+fig
+```
+
+
+The red bar represents the closing price is less than the opening price and the green bar represents the closing price is greater than the opening price.
+
+## 4. Modelling
+
+Creating a linear model for finding the relationship between response variable and other variables and their interactions
+
+### 4.1 Modelling Close for the data
+
+In this case, linear regression assumes that there exists a linear relationship between the response variable(Close) and the explanatory variables. This means that you can fit a line between the two (or more variables).
+
+```{r}
+model1 = lm(Close~Volume+dates+EPS+Open+High+Low, data =  tatamotors)
+summary(model1)
+coefficients(model1)
+ggplot(data=tatamotors, aes(x=Close, y= Open))+geom_point()+geom_smooth(method="lm")
+```
+
+In the above summary, we can understand that the Close price is correlated with Open, high and low prices of th stock.
+
+In the above plot we can understand that Open and Close price of stock market is directly proportional.
+
+### 4.2 Modelling price per earnings ratio for the data
+
+In this case, linear regression assumes that there exists a linear relationship between the response variable(pe) and the explanatory variables. This means that you can fit a line between the two (or more variables). 
+
+```{r}
+model2 = lm(pe~Volume+dates+EPS+Close+Open+High+Low, data =  tatamotors)
+summary(model2)
+coefficients(model2)
+ggplot(data=tatamotors, aes(x=EPS, y=pe))+geom_point()+geom_smooth(method="lm")
+```
+In the above summary, we can see that PE is correlated with EPS and partially correlated with the high and low value.
+
+In the above plot we can understand that if EPS increases PE ratio decreases. A lower PE ratio indicates that investors have higher earnings growth expectations. In other words, Lower the PE ratio higher is the net worth or the earnings of the company and vice versa.
+
+### 4.3 Modelling Accumulation/Distribution Value for the data
+
+In this case, linear regression assumes that there exists a linear relationship between the response variable(AD) and the explanatory variables. This means that you can fit a line between the two (or more variables). 
+
+```{r}
+model3 = lm(AD~Accumulation+Distribution, data =  tatamotors)
+summary(model3)
+coefficients(model3)
+ggplot(data=tatamotors, aes(x=AD, y=Accumulation))+geom_point()+geom_smooth(method="lm")
+ggplot(data=tatamotors, aes(x=AD, y=Accumulation))+geom_point()+geom_smooth(method="lm")
+```
+In the above summary, we can understand that the Accumulation/Distribution (AD) is correlated with Accumulation and Distribution values of th stock.
+
+In the above plot we can understand that  Accumulation/Distribution (AD) and Accumulation value of stock market is directly proportional. And  Accumulation/Distribution (AD) and Distribution value of stock market is directly proportional
+
+
+## 5. Prediction
+
+The predict() function in R is used to predict the value based on the input data.
+
+### 5.1. Prediction for Closing Price in testing data set
+
+Here, I have created the future Closing price value based on the previous data and with the help of the linear model.
+
+```{r}
+predicted1 <- data.frame( predict = predict(model1, newdata = test))
+glimpse(predicted1)
+```
+### 5.2. Prediction for Price per earning ratio in testing data set
+
+Here, I have created the future Price per earning ratio value based on the previous data and with the help of the linear model.
+
+```{r}
+predicted2 <- data.frame( predict = predict(model2, newdata = test))
+glimpse(predicted2)
+```
+
+### 5.3. Prediction for Accumulation/Distribution Value in testing data set
+
+Here, I have created the future Accumulation/Distribution value based on the previous data and with the help of the linear model.
+
+```{r}
+predicted3 <- data.frame( predict = predict(model3, newdata = test))
+glimpse(predicted3)
+```
+
+### 5.4. Confidence for Close Price in the predicted values
+
+The confidence interval in the predict function will help us to gauge the uncertainty in the prediction
+
+```{r}
+predict <- predict(model1, newdata = test, interval = "confidence")
+```
+
+### 5.5. Confidence for Price per earning in the predicted values
+
+```{r}
+predict <- predict(model2, newdata = test, interval = "confidence")
+```
+
+### 5.6. Confidence for Accumulation/Distribution Value in the predicted values
+
+```{r}
+predict <- predict(model3, newdata = test, interval = "confidence")
+```
+
+## 6. Error Value
+
+The error Value representing the average difference between the observed known outcome values in the test data and the predicted outcome values by the model.
+
+### 6.1 Calculating error percentage 
+
+Below code helps finding the absolute difference between the actual and forecast values and finds the average.
+ 
+```{r}
+
+#Error percentage for Closing Price in the data
+error1 <- data.frame(e_value = (  test$Close - predicted1$predict )/test$Close * 100)
+glimpse(error1)
+mean(error1$e_value)
+
+#Error percentage for Price per earnings Ratio in the data
+error2 <- data.frame(e_value = (predicted2$predict - test$pe  )/predicted2$predict * 100)
+glimpse(error2)
+mean(error2$e_value)
+
+```
+
+For the model's prediction, the error percentage for Closing Price is 0.2159604
+For the model's prediction, the error percentage for Price per earnings Ratio is 20.6386
+
+## 7. Time Series Forecating
+
+Time series forecasting is the use of a model to predict future values based on previously observed values
+
+### 7.1. Forecasting Based on Time Series
+
+To run the forecasting models in 'R', we need to convert the data into a time series object which is done in the code below. 
+
+```{r}
+library(forecast)
+
+#time series object for Close price in the data
+time_series_c <- tatamotors %>%summarise(Close)
+glimpse(time_series_c)
+tatamotors_TS_c = ts(time_series_c, frequency = 7, start = c(2006, 4), end = c(2021, 4))
+glimpse(tatamotors_TS_c)
+plot(tatamotors_TS_c)
+
+#time series object for Price Earning Ratio in the data
+time_series_pe <- tatamotors %>% mutate(pe=pe/10)%>%summarise(pe)
+glimpse(time_series_pe)
+tatamotors_TS_pe = ts(time_series_pe, frequency = 7, start = c(2006, 4), end = c(2021, 4))
+glimpse(tatamotors_TS_pe)
+plot(tatamotors_TS_pe)
+```
+
+```{r}
+
+#Decomposing and auto plotting the Close price 
+aelecComp <- decompose(tatamotors_TS_c,type=c("multiplicative"))
+autoplot(tatamotors_TS_c, xlab = "Date", ylab = "close", title="Daily Clsoe Price")
+summary(tatamotors_TS_c)
+
+#Decomposing and auto plotting the Price per Earning Ratio(pe) 
+aelecComp <- decompose(tatamotors_TS_pe,type=c("multiplicative"))
+autoplot(tatamotors_TS_pe, xlab = "Date", ylab = "pe", title="Price Per Earning")
+summary(tatamotors_TS_pe)
+```
+
+### 7.2. Forecasting using Naive method
+
+The simplest forecasting method is to use the most recent observation as the forecast for the next observation. For this the function snaive() is used.
+
+```{r}
+
+#Forecasting for Daily Close Price
+S_naive_c <- snaive(tatamotors_TS_c, h=12)
+autoplot(S_naive_c, xlab = "Date", ylab = "close")
+
+#Forecasting for Price Per Earning Ratio
+S_naive_pe <- snaive(tatamotors_TS_pe, h=12)
+autoplot(S_naive_pe, xlab = "Date", ylab = "pe")
+
+```
+
+In the above Graph, the 80% prediction interval is in the dark shaded region, and the 95% prediction interval is in the light shaded regions. We observe that the longer-ranger forecasts have wider prediction intervals. When the prediction interval is wider, the forecasts have more uncertainties, and the predicted values may become less meaningful.
+
+
+
+## Reference:
+
+1. https://finance.yahoo.com/quote/TTM?p=TTM
+2. https://www.investopedia.com/terms/a/accumulationdistribution.asp
+3. https://www.journaldev.com/45290/predict-function-in-r
+4. https://www.rdocumentation.org/packages/survMisc/versions/0.4.2/topics/autoplot
+5. https://www.mssqltips.com/sqlservertip/6778/time-series-forecasting-methods-with-r-examples/
+6. https://www.investopedia.com/terms/p/price-earningsratio.asp
+7. https://plotly.com/r/candlestick-charts/
